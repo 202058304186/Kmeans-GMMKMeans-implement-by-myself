@@ -104,8 +104,6 @@ def KMean(data:np.array, k, Threshold = 0.0, MaxTimes = 10000000):
 def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstimes = 3):
     """Gaussian mixture distribution clustering, EM ideas"""
     def kernel(x, n, mean, cov):
-        #print(cov)
-        #print("det(cov): ", np.linalg.det(cov))
         vector1D = (x - mean).reshape(1, -1)
 
         det_cov = np.linalg.det(cov)
@@ -119,17 +117,16 @@ def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstime
         return  first * second
     
     notDone, times = True, 0
-    alpha   = np.array([1./k for i in range(k)])
-    #mean    = data[np.random.randint(0, data.shape[0], k), :]
-    _, mean = KMean(data, k, 0.0, kmeanstimes)
-    cov     = np.array([np.diag([0.1 for i in range(data.shape[1])]) for i in range(k)])
-    gamma   = np.zeros((data.shape[0], k), dtype="float")
-
+    alpha   = np.array([1./k for i in range(k)])    # alpha is the weights of each Gaussian distribution.
+    _, mean = KMean(data, k, 0.0, kmeanstimes)      #only need centers from KMean
+    cov     = np.array([np.diag([0.1 for i in range(data.shape[1])]) for i in range(k)]) 
+    gamma   = np.zeros((data.shape[0], k), dtype="float")   #gamma is the posterior probability matrix. 
+                                                            #gamma[i, j] denotes the posterior probability that the sample belongs to the jth Gaussian distribution
     old_mean = np.copy(mean)
     while notDone and times < MaxTimes:
         # E Step
         for sindex, sample in enumerate(data):
-            posibilityOfXi = 0.0
+            posibilityOfXi = 0.
             for j in range(k):
                 posibilityOfXi += alpha[j] * kernel(sample, data.shape[1], mean[j], cov[j])
             for j in range(k):
@@ -137,9 +134,7 @@ def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstime
 
         # M Step
         for i in range(k):
-            gamma_sum        = 0.0
-            weight_gamma_each_k = 0.0
-            cov_top             = 0.0
+            gamma_sum, weight_gamma_each_k, cov_top = 0., 0., 0.
             for j in range(data.shape[0]):
                 gamma_sum           += gamma[j, i]
                 weight_gamma_each_k += gamma[j, i] * data[j]
@@ -150,8 +145,8 @@ def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstime
             for j in range(data.shape[0]):
                 vector1D = (data[j,:] - mean[i]).reshape(1, -1)
                 cov_top += gamma[j, i] * np.dot((vector1D).T, (vector1D))
-            cov[i] = cov_top / gamma_sum
-            cov[i] += np.eye(data.shape[1]) * 1e-6
+
+            cov[i] = cov_top / gamma_sum + np.eye(data.shape[1]) * 1e-6
 
             # Preventing a cluster from having too little weight
             if alpha[i] < 1e-3:
@@ -167,6 +162,7 @@ def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstime
     
     types = np.argmax(gamma, axis = 1)
     centers = np.empty((k, data.shape[1]), dtype = "float")
+    
     for cindex in range(k):
         centers[cindex] = np.mean(data[types == cindex, :], axis = 0) #(n 2) -> (1,2)
 
