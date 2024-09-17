@@ -43,7 +43,7 @@ def plot_scatter(x:np.array, y:np.array, color = None, title = ""):
 
 def plot_KMean2DScatter(data:list, centers:np.array, title = "", colors = []):
     plt.figure()
-    k = len(data) #计算有几个K
+    k = len(data)
     if len(colors) == 0:
         colors = get_n_hls_colors(k)
     for i in range(k):
@@ -58,7 +58,7 @@ def plot_KMean2DScatter(data:list, centers:np.array, title = "", colors = []):
 def plot_KMean3DScatter(data:list, centers:np.array, title = "", colors = []):
     plt.figure()
     ax1 = plt.axes(projection='3d')
-    k = len(data) #计算有几个K
+    k = len(data)
     if len(colors) == 0:
         colors = get_n_hls_colors(k)
     for i in range(k):
@@ -83,34 +83,33 @@ def KMean(data:np.array, k, Threshold = 0.0, MaxTimes = 10000000):
     times = 0
     while isChange and times < MaxTimes:
         for mindex, temp in enumerate(data):
-            #计算每个节点与所有中心的距离
-            dists = np.sqrt(np.sum((temp - centers) ** 2, axis = 1)) #(1 2) - (3 2) -> (3 2) ** 2 -> (3 2) -> sum((3 2) axis = 1) -> (3 1)
-            #将节点划分到最近的中心中去。
-            cPos = np.argmin(dists)
+            # computing distance between every sample and every center
+            dists = np.sqrt(np.sum((temp - centers) ** 2, axis = 1))    #(1 2) - (3 2) -> (3 2) ** 2 -> (3 2) -> sum((3 2) axis = 1) -> (3 1)
+            cPos = np.argmin(dists)                                     # divide the sample into the nearest cluster
             types[mindex] = cPos
 
-        #重新计算每个聚类的中心
+        # update the center of each cluster
         for cindex in range(k):
             if data[types == cindex, :].shape[0] > 0:
                 newCenter = np.mean(data[types == cindex, :], axis = 0) #(n 2) -> (1,2)
                 isChange = np.any(np.fabs(newCenter - centers[cindex]) >= Threshold)
                 centers[cindex] = newCenter
         times += 1
-    #聚类:返回不同的集合，返回中心点
+    # return dataset divided by cluster and their centers
     C = [data[types == i, :] for i in range(k)]
     return C, centers
 
 
 
 def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstimes = 3):
-    """高斯混合分布聚类，EM思想"""
+    """Gaussian mixture distribution clustering, EM ideas"""
     def kernel(x, n, mean, cov):
         #print(cov)
         #print("det(cov): ", np.linalg.det(cov))
         vector1D = (x - mean).reshape(1, -1)
 
         det_cov = np.linalg.det(cov)
-        # 防止协方差矩阵的行列式接近0，导致数值不稳定
+        # Prevents the determinant of the covariance matrix from approaching 0, leading to unstable values
         if det_cov == 0:
             det_cov += 1e-6
 
@@ -128,15 +127,15 @@ def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstime
 
     old_mean = np.copy(mean)
     while notDone and times < MaxTimes:
-        #计算后验 E步
+        # E Step
         for sindex, sample in enumerate(data):
             posibilityOfXi = 0.0
             for j in range(k):
                 posibilityOfXi += alpha[j] * kernel(sample, data.shape[1], mean[j], cov[j])
             for j in range(k):
-                #计算样本xi属于某个核的后验概率
                 gamma[sindex, j] = alpha[j] * kernel(sample, data.shape[1], mean[j], cov[j]) / posibilityOfXi
 
+        # M Step
         for i in range(k):
             gamma_sum        = 0.0
             weight_gamma_each_k = 0.0
@@ -154,25 +153,22 @@ def GMM_KMeans(data:np.array, k, threshold = 0.0, MaxTimes = 1000000, kmeanstime
             cov[i] = cov_top / gamma_sum
             cov[i] += np.eye(data.shape[1]) * 1e-6
 
-            # 防止某个簇权重过小
+            # Preventing a cluster from having too little weight
             if alpha[i] < 1e-3:
                 mean[i] = data[np.random.randint(0, data.shape[0])]
                 cov[i]  = np.eye(data.shape[1]) * 0.1
 
-            # 检查收敛
+            # Checking for convergence
             if np.linalg.norm(mean - old_mean) < threshold:
                 break
             old_mean = np.copy(mean)
 
         times += 1
     
-    types = np.empty(data.shape[0], dtype = "int")
     types = np.argmax(gamma, axis = 1)
-
     centers = np.empty((k, data.shape[1]), dtype = "float")
     for cindex in range(k):
         centers[cindex] = np.mean(data[types == cindex, :], axis = 0) #(n 2) -> (1,2)
-
 
     return [data[types == i, :] for i in range(k)], centers 
 
